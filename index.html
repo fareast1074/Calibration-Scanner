@@ -184,13 +184,14 @@
         </div>
 
         <div class="stats-bar">
-            <div class="stat-card"><span id="totalScans" class="stat-val">0</span><span class="stat-lbl">Filtered Scans</span></div>
-            <div class="stat-card" style="border-color: var(--danger);"><span id="totalFails" class="stat-val" style="color: var(--danger);">0</span><span class="stat-lbl">Failures Found</span></div>
+            <div class="stat-card"><span id="totalScans" class="stat-val">0</span><span class="stat-lbl">Total Scans</span></div>
+            <div class="stat-card" style="border-color: var(--primary);"><span id="avgTimeStat" class="stat-val">0.0</span><span class="stat-lbl">Avg Min/Scan</span></div>
+            <div class="stat-card" style="border-color: var(--danger);"><span id="totalFails" class="stat-val" style="color: var(--danger);">0</span><span class="stat-lbl">Failures</span></div>
         </div>
 
-        <div class="section-header">Audit Trend (Hourly Activity)</div>
+        <div class="section-header">Audit Time Analysis (Minutes per Item)</div>
         <div style="background:rgba(17, 34, 64, 0.8); padding:20px; border-radius:12px; border:1px solid #233554; margin-bottom:20px;">
-            <canvas id="trendChart" height="120" style="width: 100%;"></canvas>
+            <canvas id="timeChart" height="120" style="width: 100%;"></canvas>
         </div>
 
         <div style="display:flex; gap:10px; margin-bottom:15px;">
@@ -245,7 +246,6 @@
         let loggedInUser = "";
         let html5QrCode = null;
         
-        // Gauge variables
         let currentGaugeValue = 0;
         let targetGaugeValue = 0;
 
@@ -258,11 +258,10 @@
                 document.getElementById('mainApp').style.display = 'block';
                 initScannerInput();
                 drawGauge(0);
-                updateTrendChart();
+                updateTimeChart();
             } else { alert("Invalid Credentials"); }
         }
 
-        // --- GAUGE LOGIC ---
         function drawGauge(percent) {
             targetGaugeValue = percent;
             animateGauge();
@@ -308,29 +307,44 @@
 
         function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-        // --- CHART LOGIC ---
-        function updateTrendChart() {
-            const canvas = document.getElementById('trendChart');
+        // --- TIME CONSUMING LOGIC (REPLACED TREND) ---
+        function updateTimeChart() {
+            const canvas = document.getElementById('timeChart');
             const ctx = canvas.getContext('2d');
             const width = canvas.offsetWidth;
             const height = canvas.offsetHeight;
             canvas.width = width;
             canvas.height = height;
 
-            const hourlyData = {};
+            // Hourly buckets for Average Time per scan
+            const hourlyTotalMinutes = {};
+            const hourlyCount = {};
             for (let i = 7; i <= 20; i++) {
-                hourlyData[i.toString().padStart(2, '0') + ":00"] = 0;
+                const h = i.toString().padStart(2, '0') + ":00";
+                hourlyTotalMinutes[h] = 0;
+                hourlyCount[h] = 0;
             }
 
-            scanHistory.forEach(scan => {
-                const hour = scan.time.split(':')[0].split(' ')[0]; // Handle 12/24 formats
-                const label = hour.padStart(2, '0') + ":00";
-                if (hourlyData.hasOwnProperty(label)) hourlyData[label]++;
-            });
+            // Calculate intervals (Time consuming per scan)
+            // We sort history by timestamp to find gaps
+            const sorted = [...scanHistory].sort((a,b) => a.ts - b.ts);
+            for(let i = 1; i < sorted.length; i++) {
+                const gapMs = sorted[i].ts - sorted[i-1].ts;
+                const gapMin = gapMs / 60000;
+                
+                // If gap is > 30 mins, assume lunch/break and don't count it in productivity
+                if(gapMin < 30) {
+                    const hourLabel = new Date(sorted[i].ts).getHours().toString().padStart(2, '0') + ":00";
+                    if(hourlyTotalMinutes.hasOwnProperty(hourLabel)) {
+                        hourlyTotalMinutes[hourLabel] += gapMin;
+                        hourlyCount[hourLabel]++;
+                    }
+                }
+            }
 
-            const labels = Object.keys(hourlyData);
-            const values = Object.values(hourlyData);
-            const maxVal = Math.max(...values, 5);
+            const labels = Object.keys(hourlyTotalMinutes);
+            const averages = labels.map(l => hourlyCount[l] > 0 ? (hourlyTotalMinutes[l] / hourlyCount[l]) : 0);
+            const maxVal = Math.max(...averages, 5);
 
             ctx.clearRect(0, 0, width, height);
             ctx.strokeStyle = '#233554';
@@ -341,15 +355,15 @@
             }
 
             ctx.beginPath();
-            ctx.strokeStyle = varColor('--primary');
+            ctx.strokeStyle = varColor('--danger'); // Red line indicates "time spent"
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
-            ctx.shadowBlur = 10; ctx.shadowColor = varColor('--primary');
+            ctx.shadowBlur = 10; ctx.shadowColor = varColor('--danger');
 
             const stepX = (width - 60) / (labels.length - 1);
             labels.forEach((label, i) => {
                 const x = 40 + (i * stepX);
-                const y = (height - 20) - (values[i] / maxVal * (height - 40));
+                const y = (height - 20) - (averages[i] / maxVal * (height - 40));
                 if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             });
             ctx.stroke();
@@ -357,17 +371,21 @@
 
             labels.forEach((label, i) => {
                 const x = 40 + (i * stepX);
-                const y = (height - 20) - (values[i] / maxVal * (height - 40));
-                ctx.fillStyle = values[i] > 0 ? varColor('--primary') : '#233554';
+                const y = (height - 20) - (averages[i] / maxVal * (height - 40));
+                ctx.fillStyle = averages[i] > 0 ? varColor('--danger') : '#233554';
                 ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
                 if (i % 2 === 0) {
                     ctx.fillStyle = '#8892b0'; ctx.font = '10px Arial';
                     ctx.fillText(label, x - 10, height - 5);
                 }
             });
+
+            // Update stats bar average
+            const totalActiveMin = Object.values(hourlyTotalMinutes).reduce((a,b) => a+b, 0);
+            const totalActiveCount = Object.values(hourlyCount).reduce((a,b) => a+b, 0);
+            document.getElementById('avgTimeStat').innerText = totalActiveCount > 0 ? (totalActiveMin/totalActiveCount).toFixed(1) : "0.0";
         }
 
-        // --- CORE FUNCTIONS ---
         function loadMasterData(input) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -459,7 +477,10 @@
             const failed = (l === "WRONG" || d === "EXPIRED" || m === "NO" || currentItem.name === "NOT IN DATABASE");
 
             scanHistory.unshift({
-                id: Date.now(), time: new Date().toLocaleTimeString(), barcode: currentItem.barcode, name: currentItem.name,
+                id: Date.now(), 
+                ts: Date.now(), // Added for time consuming math
+                time: new Date().toLocaleTimeString(), 
+                barcode: currentItem.barcode, name: currentItem.name,
                 pic: loggedInUser, locRes: l, dueRes: d, msaRes: m, remark: document.getElementById('qcRemark').value || "-",
                 isFail: failed
             });
@@ -499,7 +520,7 @@
                 document.getElementById('progressLabel').innerText = lbl;
             }
             drawGauge(per);
-            updateTrendChart();
+            updateTimeChart();
 
             const filteredScans = scanHistory.filter(h => {
                 const m = masterDB[h.barcode] || {};
