@@ -407,7 +407,6 @@
             });
             const targetTotal = filteredTargetList.length;
 
-            // UPDATED: Count only scans that matching filter AND ARE NOT FAILURES
             const successScannedInFilter = scanHistory.filter(h => {
                 const m = masterDB[h.barcode] || {};
                 const matchFilt = (!bf || m.bldg === bf) && (!pf || m.prod === pf);
@@ -452,32 +451,72 @@
         
         function exportToCSV() {
             if (!rawMasterRows.length) return alert("Load Master first");
+            let totalScanned = 0;
+            let totalFails = 0;
+            let totalPending = 0;
+
             let csv = rawMasterRows.map((r, idx) => {
                 if (idx === 0) return [...r, "Status", "Time", "Auditor", "Loc_Audit", "Due_Audit", "MSA_Audit", "Remark"].join(",");
                 const s = scanHistory.find(h => h.barcode === r[0].toUpperCase());
-                return s ? [...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(",") : [...r, "PENDING", "", "", "", "", "", ""].join(",");
+                if(s) {
+                    totalScanned++;
+                    if(s.isFail) totalFails++;
+                    return [...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(",");
+                } else {
+                    totalPending++;
+                    return [...r, "PENDING", "", "", "", "", "", ""].join(",");
+                }
             });
+
+            csv.push("");
+            csv.push("--- SUMMARY REPORT ---");
+            csv.push("Total Items Master," + (rawMasterRows.length - 1));
+            csv.push("Total Scanned," + totalScanned);
+            csv.push("Total Pending," + totalPending);
+            csv.push("Total Failures," + totalFails);
+            csv.push("Export Date," + new Date().toLocaleString());
+
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Audit_Report_${new Date().toLocaleDateString()}.csv`; a.click();
+            a.download = `Full_Audit_Report_${new Date().toLocaleDateString()}.csv`; a.click();
         }
 
         function exportFilteredOnly() {
             const bf = document.getElementById('filterBuilding').value;
             const pf = document.getElementById('filterProduction').value;
             if (!rawMasterRows.length) return alert("Load Master first");
+            
+            let totalFiltered = 0;
+            let totalScanned = 0;
+            let totalFails = 0;
             let csv = [];
             csv.push([...rawMasterRows[0], "Status", "Time", "Auditor", "Loc_Audit", "Due_Audit", "MSA_Audit", "Remark"].join(","));
+            
             rawMasterRows.slice(1).forEach(r => {
                 const code = r[0].toUpperCase();
                 const item = masterDB[code];
                 const matchFilt = (!bf || item.bldg === bf) && (!pf || item.prod === pf);
                 if (matchFilt) {
+                    totalFiltered++;
                     const s = scanHistory.find(h => h.barcode === code);
-                    if (s) csv.push([...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(","));
-                    else csv.push([...r, "PENDING", "", "", "", "", "", ""].join(","));
+                    if (s) {
+                        totalScanned++;
+                        if(s.isFail) totalFails++;
+                        csv.push([...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(","));
+                    } else {
+                        csv.push([...r, "PENDING", "", "", "", "", "", ""].join(","));
+                    }
                 }
             });
+
+            csv.push("");
+            csv.push("--- FILTERED SUMMARY ---");
+            csv.push("Building Filter," + (bf || "All"));
+            csv.push("Production Filter," + (pf || "All"));
+            csv.push("Total in Filter," + totalFiltered);
+            csv.push("Scanned," + totalScanned);
+            csv.push("Failures," + totalFails);
+
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
             a.download = `Filtered_Audit.csv`; a.click();
