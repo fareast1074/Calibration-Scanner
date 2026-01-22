@@ -77,7 +77,6 @@
             margin-bottom: 20px; border: 1px solid #233554;
             display: flex; align-items: center; gap: 25px; transition: 0.3s; cursor: pointer;
         }
-        .progress-container:hover { border-color: var(--primary); background: rgba(17, 34, 64, 0.9); }
 
         .filter-panel {
             display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px;
@@ -87,9 +86,9 @@
         .filter-panel input, .filter-panel select { margin-bottom: 0; }
 
         .stats-bar { display: flex; gap: 15px; margin-bottom: 15px; }
-        .stat-card { flex: 1; background: rgba(17, 34, 64, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #233554; text-align: center; }
-        .stat-val { font-size: 1.4em; font-weight: bold; display: block; }
-        .stat-lbl { font-size: 0.7em; color: #8892b0; text-transform: uppercase; }
+        .stat-card { flex: 1; background: rgba(17, 34, 64, 0.8); padding: 15px; border-radius: 8px; border: 1px solid #233554; text-align: center; }
+        .stat-val { font-size: 1.8em; font-weight: bold; display: block; }
+        .stat-lbl { font-size: 0.75em; color: #8892b0; text-transform: uppercase; margin-top: 5px; }
 
         .table-container { background: var(--card-bg); border-radius: 12px; overflow-x: auto; border: 1px solid #233554; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85em; min-width: 950px; }
@@ -112,7 +111,6 @@
             width: 90%; 
             max-width: 500px; 
             border: 2px solid var(--primary); 
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
         }
         
         .audit-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 15px; }
@@ -122,7 +120,7 @@
         }
 
         .btn-save {
-            background: var(--primary); color: #000; width: 100%; padding: 15px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; text-transform: uppercase; font-size: 1em;
+            background: var(--primary); color: #000; width: 100%; padding: 15px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; text-transform: uppercase;
         }
 
         #alertBanner {
@@ -158,12 +156,11 @@
         <div class="progress-container" onclick="document.getElementById('pendingBody').scrollIntoView({behavior:'smooth'})">
             <div style="position: relative; width: 100px; height: 100px;">
                 <canvas id="gaugeCanvas" width="100" height="100"></canvas>
-                <div id="progressPercent" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; color: var(--primary); font-size: 1.1em; text-shadow: 0 0 10px var(--primary-glow);">0%</div>
+                <div id="progressPercent" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; color: var(--primary); font-size: 1.1em;">0%</div>
             </div>
             <div style="flex: 1;">
-                <div id="progressLabel" style="color: var(--primary); font-size: 0.9em; font-weight: bold; letter-spacing: 1px;">AWAITING MASTER DATA...</div>
+                <div id="progressLabel" style="color: var(--primary); font-size: 0.9em; font-weight: bold;">LOAD MASTER DATA...</div>
                 <div id="progressSubLabel" style="color: #8892b0; font-size: 0.8em; margin-top: 4px;">Items: 0 / 0</div>
-                <div style="margin-top: 8px; font-size: 0.65em; color: var(--primary); opacity: 0.5; text-transform: uppercase;">Click to view pending items ↓</div>
             </div>
         </div>
 
@@ -172,37 +169,30 @@
             <input type="file" id="masterFile" accept=".csv" onchange="loadMasterData(this)" style="margin-top:10px;">
         </div>
 
-        <div class="section-header">Inventory Search & Filter</div>
         <div id="filterZone" class="filter-panel">
             <input type="text" id="globalSearch" placeholder="🔍 Search Code or Name..." oninput="updateDisplay()">
             <select id="filterBuilding" onchange="updateDisplay()"><option value="">All Buildings</option></select>
             <select id="filterProduction" onchange="updateDisplay()"><option value="">All Production</option></select>
             <div style="display: flex; gap: 8px;">
                 <button onclick="resetFilters()" style="padding:0 15px; background:#233554; color:white; border:none; border-radius:4px; cursor:pointer;">Reset</button>
-                <button onclick="exportFilteredOnly()" style="padding:0 15px; background:var(--primary); color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:0.8em;">EXPORT FILT.</button>
+                <button onclick="exportFilteredOnly()" style="padding:0 15px; background:var(--primary); color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:0.8em;">EXPORT</button>
             </div>
         </div>
 
         <div class="stats-bar">
-            <div class="stat-card"><span id="totalScans" class="stat-val">0</span><span class="stat-lbl">Total Scans</span></div>
-            <div class="stat-card" style="border-color: var(--primary);"><span id="avgTimeStat" class="stat-val">0.0</span><span class="stat-lbl">Avg Min/Scan</span></div>
-            <div class="stat-card" style="border-color: var(--danger);"><span id="totalFails" class="stat-val" style="color: var(--danger);">0</span><span class="stat-lbl">Failures</span></div>
-        </div>
-
-        <div class="section-header">Audit Time Analysis (Minutes per Item)</div>
-        <div style="background:rgba(17, 34, 64, 0.8); padding:20px; border-radius:12px; border:1px solid #233554; margin-bottom:20px;">
-            <canvas id="timeChart" height="120" style="width: 100%;"></canvas>
+            <div class="stat-card"><span id="totalScans" class="stat-val">0</span><span class="stat-lbl">Items Scanned</span></div>
+            <div class="stat-card" style="border-color: var(--danger);"><span id="totalFails" class="stat-val" style="color: var(--danger);">0</span><span class="stat-lbl">Failures Detected</span></div>
         </div>
 
         <div style="display:flex; gap:10px; margin-bottom:15px;">
             <button onclick="toggleCamera()" style="flex:1; padding:15px; background:#6f42c1; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">📷 CAMERA SCAN</button>
-            <button onclick="exportToCSV()" style="flex:1; padding:15px; background:var(--success); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">📥 DOWNLOAD FULL REPORT</button>
+            <button onclick="exportToCSV()" style="flex:1; padding:15px; background:var(--success); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">📥 FULL REPORT</button>
         </div>
 
         <div id="reader"></div>
         <input type="text" id="barcodeCollector" style="position: absolute; opacity: 0;" autocomplete="off">
 
-        <div class="section-header">Audit Logs (Recent)</div>
+        <div class="section-header">Recent Audit Logs</div>
         <div class="table-container">
             <table>
                 <thead>
@@ -212,11 +202,11 @@
             </table>
         </div>
 
-        <div class="section-header">Pending Items (Unscanned)</div>
+        <div class="section-header">Pending Items</div>
         <div class="table-container" style="background: rgba(10, 25, 47, 0.4);">
             <table>
                 <thead>
-                    <tr><th>Code</th><th>Name</th><th>Expected Loc</th><th>Expected Due</th><th>MSA Req</th></tr>
+                    <tr><th>Code</th><th>Name</th><th>Loc</th><th>Due</th><th>MSA</th></tr>
                 </thead>
                 <tbody id="pendingBody"></tbody>
             </table>
@@ -225,14 +215,14 @@
 
     <div id="qcModal">
         <div class="modal-content">
-            <h2 style="color:var(--primary); margin-top:0; text-align:center; font-size: 1.2em;">AUDIT VERIFICATION</h2>
+            <h2 style="color:var(--primary); margin-top:0; text-align:center; font-size: 1.2em;">VERIFICATION</h2>
             <div id="modalDataBox" style="background: #0a192f; padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #233554; font-size: 0.9em;"></div>
             <div class="audit-grid">
                 <div class="audit-field"><label>Location</label><select id="qcLoc"><option value="CORRECT">CORRECT</option><option value="WRONG">WRONG</option></select></div>
                 <div class="audit-field"><label>Due Date</label><select id="qcDue"><option value="VALID">VALID</option><option value="EXPIRED">EXPIRED</option></select></div>
                 <div class="audit-field"><label>MSA STICKER</label><select id="qcMsa"><option value="YES">YES</option><option value="NO">NO</option></select></div>
             </div>
-            <input type="text" id="qcRemark" style="width:100%; padding:12px; background:#0a192f; color:white; border:1px solid #233554; border-radius:8px; box-sizing:border-box; margin-bottom:10px;" placeholder="Optional remark...">
+            <input type="text" id="qcRemark" style="width:100%; padding:12px; background:#0a192f; color:white; border:1px solid #233554; border-radius:8px; box-sizing:border-box; margin-bottom:10px;" placeholder="Remark...">
             <button class="btn-save" onclick="submitQC()">SAVE AUDIT RECORD</button>
         </div>
     </div>
@@ -258,7 +248,6 @@
                 document.getElementById('mainApp').style.display = 'block';
                 initScannerInput();
                 drawGauge(0);
-                updateTimeChart();
             } else { alert("Invalid Credentials"); }
         }
 
@@ -298,93 +287,11 @@
             ctx.strokeStyle = varColor('--primary');
             ctx.lineWidth = 10;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = varColor('--primary');
             ctx.stroke();
-            ctx.shadowBlur = 0;
             document.getElementById('progressPercent').innerText = Math.round(currentGaugeValue) + "%";
         }
 
         function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-
-        // --- TIME CONSUMING LOGIC (REPLACED TREND) ---
-        function updateTimeChart() {
-            const canvas = document.getElementById('timeChart');
-            const ctx = canvas.getContext('2d');
-            const width = canvas.offsetWidth;
-            const height = canvas.offsetHeight;
-            canvas.width = width;
-            canvas.height = height;
-
-            // Hourly buckets for Average Time per scan
-            const hourlyTotalMinutes = {};
-            const hourlyCount = {};
-            for (let i = 7; i <= 20; i++) {
-                const h = i.toString().padStart(2, '0') + ":00";
-                hourlyTotalMinutes[h] = 0;
-                hourlyCount[h] = 0;
-            }
-
-            // Calculate intervals (Time consuming per scan)
-            // We sort history by timestamp to find gaps
-            const sorted = [...scanHistory].sort((a,b) => a.ts - b.ts);
-            for(let i = 1; i < sorted.length; i++) {
-                const gapMs = sorted[i].ts - sorted[i-1].ts;
-                const gapMin = gapMs / 60000;
-                
-                // If gap is > 30 mins, assume lunch/break and don't count it in productivity
-                if(gapMin < 30) {
-                    const hourLabel = new Date(sorted[i].ts).getHours().toString().padStart(2, '0') + ":00";
-                    if(hourlyTotalMinutes.hasOwnProperty(hourLabel)) {
-                        hourlyTotalMinutes[hourLabel] += gapMin;
-                        hourlyCount[hourLabel]++;
-                    }
-                }
-            }
-
-            const labels = Object.keys(hourlyTotalMinutes);
-            const averages = labels.map(l => hourlyCount[l] > 0 ? (hourlyTotalMinutes[l] / hourlyCount[l]) : 0);
-            const maxVal = Math.max(...averages, 5);
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.strokeStyle = '#233554';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 4; i++) {
-                const y = height - 20 - (i * (height - 40) / 4);
-                ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(width, y); ctx.stroke();
-            }
-
-            ctx.beginPath();
-            ctx.strokeStyle = varColor('--danger'); // Red line indicates "time spent"
-            ctx.lineWidth = 3;
-            ctx.lineJoin = 'round';
-            ctx.shadowBlur = 10; ctx.shadowColor = varColor('--danger');
-
-            const stepX = (width - 60) / (labels.length - 1);
-            labels.forEach((label, i) => {
-                const x = 40 + (i * stepX);
-                const y = (height - 20) - (averages[i] / maxVal * (height - 40));
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-            });
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-
-            labels.forEach((label, i) => {
-                const x = 40 + (i * stepX);
-                const y = (height - 20) - (averages[i] / maxVal * (height - 40));
-                ctx.fillStyle = averages[i] > 0 ? varColor('--danger') : '#233554';
-                ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-                if (i % 2 === 0) {
-                    ctx.fillStyle = '#8892b0'; ctx.font = '10px Arial';
-                    ctx.fillText(label, x - 10, height - 5);
-                }
-            });
-
-            // Update stats bar average
-            const totalActiveMin = Object.values(hourlyTotalMinutes).reduce((a,b) => a+b, 0);
-            const totalActiveCount = Object.values(hourlyCount).reduce((a,b) => a+b, 0);
-            document.getElementById('avgTimeStat').innerText = totalActiveCount > 0 ? (totalActiveMin/totalActiveCount).toFixed(1) : "0.0";
-        }
 
         function loadMasterData(input) {
             const reader = new FileReader();
@@ -467,9 +374,6 @@
             `;
             
             document.getElementById('qcModal').style.display = 'flex';
-            document.getElementById('qcLoc').value = "CORRECT";
-            document.getElementById('qcDue').value = "VALID";
-            document.getElementById('qcMsa').value = "YES";
         }
 
         function submitQC() {
@@ -478,7 +382,6 @@
 
             scanHistory.unshift({
                 id: Date.now(), 
-                ts: Date.now(), // Added for time consuming math
                 time: new Date().toLocaleTimeString(), 
                 barcode: currentItem.barcode, name: currentItem.name,
                 pic: loggedInUser, locRes: l, dueRes: d, msaRes: m, remark: document.getElementById('qcRemark').value || "-",
@@ -512,15 +415,9 @@
             if (targetTotal > 0) {
                 per = Math.min(100, Math.round((scannedInFilterCount / targetTotal) * 100));
                 document.getElementById('progressSubLabel').innerText = `Items: ${scannedInFilterCount} / ${targetTotal}`;
-                
-                let lbl = "TOTAL FACTORY COMPLETION";
-                if(bf && pf) lbl = `COMPLETION: ${bf} - ${pf}`;
-                else if(bf) lbl = `COMPLETION: BLDG ${bf}`;
-                else if(pf) lbl = `COMPLETION: PROD ${pf}`;
-                document.getElementById('progressLabel').innerText = lbl;
+                document.getElementById('progressLabel').innerText = bf || pf ? "FILTERED COMPLETION" : "TOTAL FACTORY PROGRESS";
             }
             drawGauge(per);
-            updateTimeChart();
 
             const filteredScans = scanHistory.filter(h => {
                 const m = masterDB[h.barcode] || {};
@@ -548,7 +445,6 @@
         function deleteRow(id) { 
             scanHistory = scanHistory.filter(x => x.id !== id); 
             updateDisplay(); 
-            document.getElementById('barcodeCollector').focus();
         }
         
         function exportToCSV() {
@@ -560,7 +456,7 @@
             });
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Full_Audit_${new Date().toLocaleDateString()}.csv`; a.click();
+            a.download = `Audit_Report_${new Date().toLocaleDateString()}.csv`; a.click();
         }
 
         function exportFilteredOnly() {
@@ -581,7 +477,7 @@
             });
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Filtered_Audit_${bf||'All'}_${pf||'All'}.csv`; a.click();
+            a.download = `Filtered_Audit.csv`; a.click();
         }
 
         async function toggleCamera() {
