@@ -11,6 +11,7 @@
             --primary-glow: rgba(0, 229, 255, 0.4);
             --success: #00e676; 
             --danger: #ff1744; 
+            --warning: #ffea00;
             --bg: #050a14; 
             --card-bg: rgba(10, 25, 47, 0.85);
         }
@@ -103,7 +104,7 @@
         .section-header { color: var(--primary); font-size: 0.85em; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
         .section-header::after { content: ""; flex: 1; height: 1px; background: #233554; }
 
-        #qcModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        #qcModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); outline: none; }
         .modal-content { 
             background: #0d1b2a; 
             padding: 25px; 
@@ -150,7 +151,7 @@
     <div id="mainApp">
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; background:rgba(10,25,47,0.8); padding:10px 20px; border-radius:10px; border:1px solid #233554;">
             <span>User: <strong id="userDisp" style="color:var(--primary)">-</strong></span>
-            <button onclick="location.reload()" style="background:#233554; color:white; border:none; padding:5px 15px; border-radius:5px; cursor:pointer;">Logout</button>
+            <button onclick="logout()" style="background:#233554; color:white; border:none; padding:5px 15px; border-radius:5px; cursor:pointer;">Logout & Clear</button>
         </div>
 
         <div class="progress-container" onclick="document.getElementById('pendingBody').scrollIntoView({behavior:'smooth'})">
@@ -161,7 +162,7 @@
             <div style="flex: 1;">
                 <div id="progressLabel" style="color: var(--success); font-size: 0.9em; font-weight: bold;">LOAD MASTER DATA...</div>
                 <div id="progressSubLabel" style="color: #8892b0; font-size: 0.8em; margin-top: 4px;">Success: 0 / 0</div>
-                <div style="font-size: 0.65em; color: #8892b0; font-style: italic;">*Failures do not count toward completion</div>
+                
             </div>
         </div>
 
@@ -214,7 +215,7 @@
         </div>
     </div>
 
-    <div id="qcModal">
+    <div id="qcModal" tabindex="0" onkeydown="if(event.key==='Enter') submitQC()">
         <div class="modal-content">
             <h2 style="color:var(--primary); margin-top:0; text-align:center; font-size: 1.2em;">VERIFICATION</h2>
             <div id="modalDataBox" style="background: #0a192f; padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #233554; font-size: 0.9em;"></div>
@@ -223,20 +224,25 @@
                 <div class="audit-field"><label>Due Date</label><select id="qcDue"><option value="VALID">VALID</option><option value="EXPIRED">EXPIRED</option></select></div>
                 <div class="audit-field"><label>MSA STICKER</label><select id="qcMsa"><option value="YES">YES</option><option value="NO">NO</option></select></div>
             </div>
-            <input type="text" id="qcRemark" style="width:100%; padding:12px; background:#0a192f; color:white; border:1px solid #233554; border-radius:8px; box-sizing:border-box; margin-bottom:10px;" placeholder="Remark...">
-            <button class="btn-save" onclick="submitQC()">SAVE AUDIT RECORD</button>
+            <input type="text" id="qcRemark" style="width:100%; padding:12px; background:#0a192f; color:white; border:1px solid #233554; border-radius:8px; box-sizing:border-box; margin-bottom:15px;" placeholder="Remark...">
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-save" style="flex: 2;" onclick="submitQC()">SAVE AUDIT RECORD</button>
+                <button onclick="closeModal()" style="flex: 1; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 10px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s;">Cancel</button>
+            </div>
         </div>
     </div>
 
     <script>
         const AUTH_PASS = "1234";
-        let scanHistory = []; 
-        let masterDB = {}; 
-        let rawMasterRows = []; 
+        // Persistence: Load from LocalStorage
+        let scanHistory = JSON.parse(localStorage.getItem('audit_history')) || []; 
+        let masterDB = JSON.parse(localStorage.getItem('master_db')) || {}; 
+        let rawMasterRows = JSON.parse(localStorage.getItem('raw_rows')) || []; 
+        
         let currentItem = null;
         let loggedInUser = "";
         let html5QrCode = null;
-        
         let currentGaugeValue = 0;
         let targetGaugeValue = 0;
 
@@ -248,8 +254,22 @@
                 document.getElementById('loginOverlay').style.display = 'none';
                 document.getElementById('mainApp').style.display = 'block';
                 initScannerInput();
-                drawGauge(0);
+                
+                // If master data already exists in local storage, rebuild UI
+                if (Object.keys(masterDB).length > 0) {
+                    rebuildFilters();
+                    updateDisplay();
+                } else {
+                    drawGauge(0);
+                }
             } else { alert("Invalid Credentials"); }
+        }
+
+        function logout() {
+            if(confirm("Logging out will clear local cache. Continue?")) {
+                localStorage.clear();
+                location.reload();
+            }
         }
 
         function drawGauge(percent) {
@@ -283,22 +303,28 @@
             const startAngle = -0.5 * Math.PI;
             const endAngle = (currentGaugeValue / 100) * (2 * Math.PI) + startAngle;
             
+            // Dynamic color logic
+            let color = getComputedStyle(document.documentElement).getPropertyValue('--success').trim();
+            if (currentGaugeValue < 70) color = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim();
+            if (currentGaugeValue < 30) color = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-            ctx.strokeStyle = varColor('--success');
+            ctx.strokeStyle = color;
             ctx.lineWidth = 10;
             ctx.lineCap = 'round';
             ctx.stroke();
-            document.getElementById('progressPercent').innerText = Math.round(currentGaugeValue) + "%";
+            
+            const pText = document.getElementById('progressPercent');
+            pText.innerText = Math.round(currentGaugeValue) + "%";
+            pText.style.color = color;
         }
-
-        function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
         function loadMasterData(input) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const rows = e.target.result.split(/\r?\n/).filter(row => row.trim() !== "");
-                masterDB = {}; bldgSet = new Set(); prodSet = new Set();
+                masterDB = {}; 
                 rawMasterRows = [];
                 
                 rows.forEach((row, i) => {
@@ -311,17 +337,26 @@
                     const bldg = (locParts[0] || "N/A").trim();
                     const prod = (locParts[1] || "N/A").trim();
 
-                    if(bldg !== "N/A") bldgSet.add(bldg);
-                    if(prod !== "N/A") prodSet.add(prod);
-
                     masterDB[columns[0].toUpperCase()] = { 
                         name: columns[1]||"UNKNOWN", loc: fullLoc, bldg: bldg, prod: prod, due: columns[3]||"N/A", msa: columns[4]||"N/A" 
                     };
                 });
-                populateDropdowns(Array.from(bldgSet).sort(), Array.from(prodSet).sort());
+                
+                localStorage.setItem('master_db', JSON.stringify(masterDB));
+                localStorage.setItem('raw_rows', JSON.stringify(rawMasterRows));
+                rebuildFilters();
                 updateDisplay();
             };
             reader.readAsText(input.files[0]);
+        }
+
+        function rebuildFilters() {
+            let bldgSet = new Set(), prodSet = new Set();
+            Object.values(masterDB).forEach(item => {
+                if(item.bldg !== "N/A") bldgSet.add(item.bldg);
+                if(item.prod !== "N/A") prodSet.add(item.prod);
+            });
+            populateDropdowns(Array.from(bldgSet).sort(), Array.from(prodSet).sort());
         }
 
         function populateDropdowns(bldgs, prods) {
@@ -368,18 +403,23 @@
             currentItem = { barcode, ...data };
             
             document.getElementById('modalDataBox').innerHTML = `
-                <div style="display:flex; justify-content:space-between; margin:8px 0;"><span style="color:var(--primary)">Code:</span> <span style="color:white; font-weight:bold;">${currentItem.barcode}</span></div>
+               <div style="display:flex; justify-content:space-between; margin:8px 0;"><span style="color:var(--primary)">Code:</span> <span style="color:white; font-weight:bold;">${currentItem.barcode}</span></div>
                 <div style="display:flex; justify-content:space-between; margin:4px 0;"><span style="color:var(--primary)">Name:</span> <span style="color:white; font-weight:bold;">${currentItem.name}</span></div>
                 <div style="border-top: 1px solid #233554; margin: 8px 0; padding-top: 8px;"></div>
-                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span style="color:var(--primary)">Loc:</span> <span style="color:white;">${currentItem.loc}</span></div>
+                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span style="color:var(--primary)">Reg. Location:</span> <span style="color:white;">${currentItem.loc}</span></div>
+                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span style="color:var(--primary)">Reg. Due:</span> <span style="color:white;">${currentItem.due}</span></div>
+                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span style="color:var(--primary)">MSA:</span> <span style="color:white;">${currentItem.msa}</span></div>
             `;
             
-            document.getElementById('qcModal').style.display = 'flex';
+            const modal = document.getElementById('qcModal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.focus(), 50);
         }
 
         function submitQC() {
+            if(!currentItem) return;
             const l = document.getElementById('qcLoc').value, d = document.getElementById('qcDue').value, m = document.getElementById('qcMsa').value;
-            const failed = (l === "WRONG" || d === "EXPIRED" || m === "NO" || currentItem.name === "NOT IN DATABASE");
+            const failed = (l === "WRONG" || d === "EXPIRED" || m === "" || currentItem.name === "NOT IN DATABASE");
 
             scanHistory.unshift({
                 id: Date.now(), 
@@ -389,8 +429,17 @@
                 isFail: failed
             });
             
+            localStorage.setItem('audit_history', JSON.stringify(scanHistory));
+            closeModal();
+        }
+
+        function closeModal() {
             document.getElementById('qcModal').style.display = 'none';
             document.getElementById('qcRemark').value = "";
+            document.getElementById('qcLoc').value = "CORRECT";
+            document.getElementById('qcDue').value = "VALID";
+            document.getElementById('qcMsa').value = "YES";
+            currentItem = null;
             updateDisplay();
             setTimeout(() => { document.getElementById('barcodeCollector').focus(); }, 100);
         }
@@ -445,78 +494,38 @@
         }
 
         function deleteRow(id) { 
-            scanHistory = scanHistory.filter(x => x.id !== id); 
-            updateDisplay(); 
+            if(confirm("Remove this entry?")) {
+                scanHistory = scanHistory.filter(x => x.id !== id); 
+                localStorage.setItem('audit_history', JSON.stringify(scanHistory));
+                updateDisplay(); 
+            }
         }
         
         function exportToCSV() {
             if (!rawMasterRows.length) return alert("Load Master first");
-            let totalScanned = 0;
-            let totalFails = 0;
-            let totalPending = 0;
-
             let csv = rawMasterRows.map((r, idx) => {
                 if (idx === 0) return [...r, "Status", "Time", "Auditor", "Loc_Audit", "Due_Audit", "MSA_Audit", "Remark"].join(",");
                 const s = scanHistory.find(h => h.barcode === r[0].toUpperCase());
-                if(s) {
-                    totalScanned++;
-                    if(s.isFail) totalFails++;
-                    return [...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(",");
-                } else {
-                    totalPending++;
-                    return [...r, "PENDING", "", "", "", "", "", ""].join(",");
-                }
+                if(s) return [...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(",");
+                return [...r, "PENDING", "", "", "", "", "", ""].join(",");
             });
-
-            csv.push("");
-            csv.push("--- SUMMARY REPORT ---");
-            csv.push("Total Items Master," + (rawMasterRows.length - 1));
-            csv.push("Total Scanned," + totalScanned);
-            csv.push("Total Pending," + totalPending);
-            csv.push("Total Failures," + totalFails);
-            csv.push("Export Date," + new Date().toLocaleString());
-
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Full_Audit_Report_${new Date().toLocaleDateString()}.csv`; a.click();
+            a.download = `Full_Audit_${new Date().toLocaleDateString()}.csv`; a.click();
         }
 
         function exportFilteredOnly() {
             const bf = document.getElementById('filterBuilding').value;
             const pf = document.getElementById('filterProduction').value;
             if (!rawMasterRows.length) return alert("Load Master first");
-            
-            let totalFiltered = 0;
-            let totalScanned = 0;
-            let totalFails = 0;
-            let csv = [];
-            csv.push([...rawMasterRows[0], "Status", "Time", "Auditor", "Loc_Audit", "Due_Audit", "MSA_Audit", "Remark"].join(","));
-            
+            let csv = [[...rawMasterRows[0], "Status", "Time", "Auditor", "Loc_Audit", "Due_Audit", "MSA_Audit", "Remark"].join(",")];
             rawMasterRows.slice(1).forEach(r => {
-                const code = r[0].toUpperCase();
-                const item = masterDB[code];
-                const matchFilt = (!bf || item.bldg === bf) && (!pf || item.prod === pf);
-                if (matchFilt) {
-                    totalFiltered++;
-                    const s = scanHistory.find(h => h.barcode === code);
-                    if (s) {
-                        totalScanned++;
-                        if(s.isFail) totalFails++;
-                        csv.push([...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(","));
-                    } else {
-                        csv.push([...r, "PENDING", "", "", "", "", "", ""].join(","));
-                    }
+                const item = masterDB[r[0].toUpperCase()];
+                if ((!bf || item.bldg === bf) && (!pf || item.prod === pf)) {
+                    const s = scanHistory.find(h => h.barcode === r[0].toUpperCase());
+                    csv.push(s ? [...r, "SCANNED", s.time, s.pic, s.locRes, s.dueRes, s.msaRes, s.remark.replace(/,/g,";")].join(",") : [...r, "PENDING", "", "", "", "", "", ""].join(","));
                 }
             });
-
-            csv.push("");
-            csv.push("--- FILTERED SUMMARY ---");
-            csv.push("Building Filter," + (bf || "All"));
-            csv.push("Production Filter," + (pf || "All"));
-            csv.push("Total in Filter," + totalFiltered);
-            csv.push("Scanned," + totalScanned);
-            csv.push("Failures," + totalFails);
-
             const blob = new Blob([csv.join("\n")], {type:'text/csv'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
             a.download = `Filtered_Audit.csv`; a.click();
